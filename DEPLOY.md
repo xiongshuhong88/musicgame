@@ -47,3 +47,26 @@ Cloudflare 会自动拉取代码、安装依赖并构建。
 - **Q: 为什么上传后背景图片/视频不显示？**
   - A: 请检查文件名大小写。Linux/Cloudflare 对大小写敏感。例如代码写的是 `Video.mp4` 但文件是 `video.mp4`，在本地 Mac 可能正常，但在服务器会报错。
   - A: 确保资源都在 `public` 文件夹内。
+
+---
+
+## 方法三：部署到私有服务器
+如果您有自己的 ECS/VPS (如 `120.25.121.215`)，可以使用 SCP 部署。
+
+### 1. 本地构建
+\`\`\`bash
+npm run build
+\`\`\`
+
+### 2. 也是一条命令上传
+如果您已配置 SSH 密钥 (如 `~/.ssh/obsidian_blog`)，可直接运行：
+\`\`\`bash
+# 1. 确保服务器目录存在
+ssh -i ~/.ssh/obsidian_blog root@120.25.121.215 "mkdir -p /www/wwwroot/musicgame"
+
+# 2. 传输文件
+scp -i ~/.ssh/obsidian_blog -r dist/* root@120.25.121.215:/www/wwwroot/musicgame
+\`\`\`
+
+### 3. 配置 Nginx
+在宝塔面板或 Nginx 配置中，添加一个新的站点指向 `/www/wwwroot/musicgame` 即可访问。
