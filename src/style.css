@@ -330,6 +330,74 @@ body {
   z-index: 100;
   font-family: 'Courier New', monospace;
   text-shadow: 2px 2px 0 #000;
+  width: 100%;
+  pointer-events: none;
+  /* Let clicks pass through except buttons */
+}
+
+#rhythm-hud>* {
+  pointer-events: auto;
+}
+
+#back-btn {
+  float: left;
+  margin-left: 20px;
+  font-size: 16px;
+  padding: 5px 15px;
+}
+
+/* Virtual Controls */
+#virtual-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  z-index: 80;
+  pointer-events: none;
+}
+
+.key-hint {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 15px 30px;
+  border-radius: 10px;
+  border: 2px solid var(--retro-gold);
+}
+
+.v-key {
+  width: 60px;
+  height: 60px;
+  background: #444;
+  border: 4px solid #fff;
+  border-bottom-width: 8px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 30px;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.1s;
+  box-shadow: 0 5px 0 #222;
+}
+
+.v-key.active {
+  transform: translateY(4px);
+  border-bottom-width: 4px;
+  box-shadow: 0 1px 0 #222;
+  background: var(--terminal-green);
+  color: #000;
+}
+
+.hint-text {
+  font-size: 20px;
+  color: var(--retro-gold);
+  margin-left: 10px;
+  animation: blink 2s infinite;
 }
 
 .score-container {

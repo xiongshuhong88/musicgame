@@ -12,7 +12,7 @@ const CONFIG = {
     ],
     // Rhythm Game Config
     NOTE_SPEED: 3,
-    SPAWN_RATE: 100 // Frames between spawns (approx 1.5s at 60fps)
+    SPAWN_RATE: 35 // Frames between spawns (Was 100, now 3x faster)
 };
 
 // State Management
@@ -49,9 +49,15 @@ const uiLayer = {
 
     // Rhythm HUD
     rhythmHud: document.getElementById('rhythm-hud'),
+    backBtn: document.getElementById('back-btn'),
     score: document.getElementById('rhythm-score'),
     combo: document.getElementById('rhythm-combo'),
     msg: document.getElementById('rhythm-message'),
+
+    // Virtual Keys
+    vControls: document.getElementById('virtual-controls'),
+    keyLeft: document.getElementById('key-left'),
+    keyRight: document.getElementById('key-right'),
 
     // Common
     transition: document.getElementById('transition-overlay'),
@@ -61,6 +67,7 @@ const uiLayer = {
 // Initialization
 function init() {
     uiLayer.startBtn.addEventListener('click', startGame);
+    if (uiLayer.backBtn) uiLayer.backBtn.addEventListener('click', returnToLobby);
     setupInputs();
 
     initBGM();
@@ -118,7 +125,7 @@ function setupInputs() {
             }
         }
 
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' || e.key === 'Backspace') {
             if (state.currentScene !== 'lobby') {
                 returnToLobby();
             }
@@ -151,10 +158,19 @@ function movePlayer() {
     let moved = false;
     const speed = CONFIG.SPEED;
 
+    const leftPressed = state.keys['ArrowLeft'] || state.keys['a'];
+    const rightPressed = state.keys['ArrowRight'] || state.keys['d'];
+
     if (state.keys['ArrowUp'] || state.keys['w']) { state.playerPos.y -= speed; moved = true; }
     if (state.keys['ArrowDown'] || state.keys['s']) { state.playerPos.y += speed; moved = true; }
-    if (state.keys['ArrowLeft'] || state.keys['a']) { state.playerPos.x -= speed; moved = true; }
-    if (state.keys['ArrowRight'] || state.keys['d']) { state.playerPos.x += speed; moved = true; }
+    if (leftPressed) { state.playerPos.x -= speed; moved = true; }
+    if (rightPressed) { state.playerPos.x += speed; moved = true; }
+
+    // Visual Key Sync
+    if (uiLayer.keyLeft) {
+        leftPressed ? uiLayer.keyLeft.classList.add('active') : uiLayer.keyLeft.classList.remove('active');
+        rightPressed ? uiLayer.keyRight.classList.add('active') : uiLayer.keyRight.classList.remove('active');
+    }
 
     const container = document.getElementById('game-container');
     const maxX = container.clientWidth - CONFIG.PLAYER_SIZE;
@@ -197,6 +213,7 @@ function startRhythmGame() {
     setPowerUp('normal');
 
     uiLayer.rhythmHud.classList.remove('hidden');
+    if (uiLayer.vControls) uiLayer.vControls.classList.remove('hidden');
     updateHud();
 
     // Player visible in room
@@ -207,6 +224,7 @@ function startRhythmGame() {
 function stopRhythmGame() {
     state.rhythm.isPlaying = false;
     uiLayer.rhythmHud.classList.add('hidden');
+    if (uiLayer.vControls) uiLayer.vControls.classList.add('hidden');
     setPowerUp('normal');
 
     // Clear notes
@@ -319,18 +337,18 @@ function spawnNote() {
     const startX = Math.random() * (maxX - 50) + 25;
 
     noteEl.style.left = `${startX}px`;
-    noteEl.style.top = '-50px';
+    noteEl.style.top = '-70px';
 
     sceneLayer.appendChild(noteEl);
 
     state.rhythm.notes.push({
         el: noteEl,
         x: startX,
-        y: -50,
+        y: -70, // Start higher up
         speed: CONFIG.NOTE_SPEED + speedMod + (Math.random() * 2),
         type: type,
-        width: 40,
-        height: 40
+        width: 70, // Updated size
+        height: 70
     });
 }
 // checkNoteCollision kept same...
@@ -350,7 +368,7 @@ function checkNoteCollision(note) {
     }
 
     // Shrink hitbox slightly for forgiveness
-    const noteRect = { l: note.x, r: note.x + note.width, t: note.y, b: note.y + note.height };
+    const noteRect = { l: note.x + 10, r: note.x + note.width - 10, t: note.y + 10, b: note.y + note.height - 10 };
     const playerRect = { l: pX + offsetX, r: pX + pS - offsetX, t: pY + 20, b: pY + pS };
 
     return !(playerRect.r < noteRect.l ||
