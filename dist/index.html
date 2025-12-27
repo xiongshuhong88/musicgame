@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>复古歌舞厅音乐探索</title>
+  <script type="module" crossorigin src="/assets/index-kMXz0Joc.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-qdYq3QkG.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- CRT Overlay Effects -->
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
+
+    <!-- Game Container -->
+    <div id="game-container">
+      <!-- Scenes will be rendered here -->
+      <div id="scene-layer"></div>
+
+      <!-- Character -->
+      <div id="player" class="character"></div>
+
+      <!-- UI Overlay -->
+      <div id="ui-layer">
+        <!-- Start Screen -->
+        <div id="start-screen">
+          <h1 class="title">复古歌舞厅</h1>
+          <p class="subtitle">RETRO DISCO MUSIC GAME</p>
+          <button id="start-btn" class="retro-btn large blink">点击进入 <span
+              style="font-size:0.6em">(Enter)</span></button>
+        </div>
+
+        <!-- Controls Hint -->
+        <div id="controls-hint" class="hidden">
+          WASD / 方向键 移动<br>
+          直接撞击房门进入<br>
+          ESC 退出房间
+        </div>
+
+        <div id="score-board" class="hidden">正确率: <span id="accuracy">0</span>%</div>
+        <div id="rhythm-hud" class="hidden">
+          <div class="score-container">SCORE: <span id="rhythm-score">0</span></div>
+          <div class="combo-container">COMBO <span id="rhythm-combo">0</span></div>
+          <div id="rhythm-message"></div>
+        </div>
+        <!-- Removed Old Input Panel -->
+        <div id="transition-overlay" class="hidden">
+          <div class="disk-spinner"></div>
+          <div class="loading-text">放碟中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

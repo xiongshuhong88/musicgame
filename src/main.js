@@ -33,7 +33,9 @@ const state = {
         frameCount: 0,
         isPlaying: false,
         powerUp: 'normal',
-        powerUpTimer: 0
+        powerUpTimer: 0,
+        speedMod: 1,
+        freezeTimer: 0
     }
 };
 
@@ -95,8 +97,6 @@ function startGame() {
 
     renderLobby();
 
-    // Remove broken setupListeners call
-
     const container = document.getElementById('game-container');
     const startX = (container.clientWidth - CONFIG.PLAYER_SIZE) / 2;
     const startY = container.clientHeight - CONFIG.PLAYER_SIZE - 20;
@@ -107,6 +107,7 @@ function startGame() {
     gameLoop();
 }
 
+// Input Handling
 function setupInputs() {
     window.addEventListener('keydown', (e) => {
         state.keys[e.key] = true;
@@ -128,8 +129,6 @@ function setupInputs() {
         playerEl.classList.remove('walking');
     });
 }
-// Remove setupListeners function
-
 
 // Game Loop
 function gameLoop() {
@@ -142,7 +141,7 @@ function gameLoop() {
         checkCollisions();
     } else {
         // Assume Room Scene -> Rhythm Game
-        movePlayer(); // Player can move inside room to catch notes
+        movePlayer();
         updateRhythmGame();
     }
 }
@@ -161,14 +160,10 @@ function movePlayer() {
     const maxX = container.clientWidth - CONFIG.PLAYER_SIZE;
     const maxY = container.clientHeight - CONFIG.PLAYER_SIZE;
 
-    // Different bounds for Lobby vs Room?
-    // In Room, we want player at bottom to catch notes.
-    // Let's enforce a "stage area" at bottom 30% for Room.
+    // In Room, player is restricted to bottom stage area
     let minY = container.clientHeight * 0.70;
 
     if (typeof state.currentScene === 'number') {
-        // In Rhythm Game, give a bit more vertical freedom or restrict strictly to a "Lane"?
-        // Let's keep it free movement for "Catch" gameplay.
         minY = container.clientHeight * 0.60;
     }
 
@@ -198,6 +193,9 @@ function startRhythmGame() {
     state.rhythm.frameCount = 0;
     state.rhythm.isPlaying = true;
 
+    // Reset Powerups
+    setPowerUp('normal');
+
     uiLayer.rhythmHud.classList.remove('hidden');
     updateHud();
 
@@ -209,10 +207,26 @@ function startRhythmGame() {
 function stopRhythmGame() {
     state.rhythm.isPlaying = false;
     uiLayer.rhythmHud.classList.add('hidden');
+    setPowerUp('normal');
 
     // Clear notes
     state.rhythm.notes.forEach(n => n.el.remove());
     state.rhythm.notes = [];
+}
+
+function setPowerUp(type) {
+    state.rhythm.powerUp = type;
+    playerEl.classList.remove('big', 'star');
+
+    if (type === 'big') {
+        playerEl.classList.add('big');
+        state.rhythm.powerUpTimer = performance.now() + 15000; // 15s
+        showFeedback("BIG MODE!", "#e50914");
+    } else if (type === 'star') {
+        playerEl.classList.add('star');
+        state.rhythm.powerUpTimer = performance.now() + 8000; // 8s
+        showFeedback("INVINCIBLE!", "#ffd700");
+    }
 }
 
 function updateRhythmGame() {
@@ -220,9 +234,19 @@ function updateRhythmGame() {
 
     state.rhythm.frameCount++;
 
+    // Check PowerUp Expiry
+    if (state.rhythm.powerUp !== 'normal' && performance.now() > state.rhythm.powerUpTimer) {
+        setPowerUp('normal');
+    }
+
     // 1. Spawn Notes
     if (state.rhythm.frameCount % CONFIG.SPAWN_RATE === 0) {
         spawnNote();
+    }
+
+    // Check Freeze Expiry
+    if (state.rhythm.speedMod < 1 && performance.now() > state.rhythm.freezeTimer) {
+        state.rhythm.speedMod = 1; // Reset speed
     }
 
     // 2. Update Notes Position
@@ -232,13 +256,21 @@ function updateRhythmGame() {
     // Iterate backwards to remove safely
     for (let i = state.rhythm.notes.length - 1; i >= 0; i--) {
         const note = state.rhythm.notes[i];
-        note.y += note.speed;
+
+        // Apply Speed Modifier (Ice effect)
+        let currentSpeed = note.speed * (state.rhythm.speedMod || 1);
+        note.y += currentSpeed;
+
         note.el.style.top = `${note.y}px`;
 
         // check miss
         if (note.y > limitY) {
-            // MISS
-            resolveHit(note, false);
+            // MISS (Bomb misses are good!)
+            if (note.type !== 'bomb') {
+                resolveHit(note, false);
+            } else {
+                note.el.remove(); // Bomb fell safely
+            }
             state.rhythm.notes.splice(i, 1);
             continue;
         }
@@ -257,14 +289,32 @@ function spawnNote() {
     const noteEl = document.createElement('div');
     noteEl.className = 'note';
 
-    // Random type
-    const type = Math.random() > 0.5 ? 'style-1' : 'style-2';
+    // New Probability Table
+    // Normal: 70% | Coin: 10% | Bomb: 7% | Mushroom: 5% | Star: 5% | Ice: 3%
+    const rand = Math.random();
+    let type = 'style-1';
+    let content = '🎵';
+    let speedMod = 0;
+
+    if (rand < 0.03) {
+        type = 'ice'; content = '❄️'; speedMod = 1; // 3%
+    } else if (rand < 0.08) {
+        type = 'mushroom'; content = '🍄'; speedMod = 2; // 5%
+    } else if (rand < 0.13) {
+        type = 'star'; content = '⭐'; speedMod = 3; // 5%
+    } else if (rand < 0.20) {
+        type = 'bomb'; content = '💣'; speedMod = 0; // 7%
+    } else if (rand < 0.30) {
+        type = 'coin'; content = '🪙'; speedMod = 2; // 10%
+    } else if (rand < 0.65) {
+        type = 'style-2'; content = '★'; // 35%
+    }
+
+    // Apply class
     noteEl.classList.add(type);
+    noteEl.textContent = content;
 
-    // Symbol
-    noteEl.textContent = Math.random() > 0.5 ? '🎵' : '★';
-
-    // Spawn X: Random within width, keep padding
+    // Spawn X
     const maxX = container.clientWidth - 50;
     const startX = Math.random() * (maxX - 50) + 25;
 
@@ -277,22 +327,31 @@ function spawnNote() {
         el: noteEl,
         x: startX,
         y: -50,
-        speed: CONFIG.NOTE_SPEED + (Math.random() * 2), // Variable speed
+        speed: CONFIG.NOTE_SPEED + speedMod + (Math.random() * 2),
         type: type,
         width: 40,
         height: 40
     });
 }
+// checkNoteCollision kept same...
+// resolveHit needs update for Logic
 
 function checkNoteCollision(note) {
     // Simple AABB
     const pX = state.playerPos.x;
     const pY = state.playerPos.y;
-    const pS = CONFIG.PLAYER_SIZE;
+    let pS = CONFIG.PLAYER_SIZE;
+
+    // Hitbox is bigger if in BIG mode
+    let offsetX = 5;
+    if (state.rhythm.powerUp === 'big') {
+        offsetX = -15; // Expand outwards
+        pS = pS + 30;
+    }
 
     // Shrink hitbox slightly for forgiveness
     const noteRect = { l: note.x, r: note.x + note.width, t: note.y, b: note.y + note.height };
-    const playerRect = { l: pX + 5, r: pX + pS - 5, t: pY + 20, b: pY + pS }; // Use bottom half of player
+    const playerRect = { l: pX + offsetX, r: pX + pS - offsetX, t: pY + 20, b: pY + pS };
 
     return !(playerRect.r < noteRect.l ||
         playerRect.l > noteRect.r ||
@@ -302,24 +361,72 @@ function checkNoteCollision(note) {
 
 function resolveHit(note, isHit) {
     if (isHit) {
-        state.rhythm.score += 100 + (state.rhythm.combo * 10);
+        // Special Case: BOMB
+        if (note.type === 'bomb') {
+            // If Invincible, destroy bomb!
+            if (state.rhythm.powerUp === 'star') {
+                state.rhythm.score += 200;
+                audio.playSuccess();
+                showFeedback("DESTROY!", "#eda002");
+                showHitEffect(note.x, note.y);
+            } else {
+                // OUCH!
+                state.rhythm.score = Math.max(0, state.rhythm.score - 500);
+                state.rhythm.combo = 0;
+                audio.playFail();
+                showFeedback("BOOM!!", "#f00");
+
+                // Shake Screen
+                document.body.classList.add('shake');
+                setTimeout(() => document.body.classList.remove('shake'), 500);
+
+                // Lose Powerup
+                if (state.rhythm.powerUp === 'big') setPowerUp('normal');
+            }
+            note.el.remove();
+            updateHud();
+            return;
+        }
+
+        // Normal Hits
+        let points = 100;
+        let label = "PERFECT!";
+        let color = "#0f0";
+
+        if (note.type === 'coin') { points = 300; label = "RICH!"; color = "#ffd700"; }
+        if (state.rhythm.powerUp === 'star') points *= 2;
+
+        state.rhythm.score += points + (state.rhythm.combo * 10);
         state.rhythm.combo++;
         audio.playSuccess();
 
-        // Remove Note DOM
         note.el.remove();
 
-        // Show Effect
+        // Apply Effects
+        if (note.type === 'mushroom') { setPowerUp('big'); label = "GROW!"; }
+        if (note.type === 'star') { setPowerUp('star'); label = "STAR!"; }
+        if (note.type === 'ice') {
+            state.rhythm.speedMod = 0.5; // Slow down
+            state.rhythm.freezeTimer = performance.now() + 5000; // 5s
+            label = "FREEZE!"; color = "#a0eaff";
+        }
+
         showHitEffect(note.x, note.y);
-        showFeedback("PERFECT!", "#0f0");
+        showFeedback(label, color);
 
     } else {
-        // Miss
-        state.rhythm.combo = 0;
-        audio.playFail();
+        // Miss (Non-bomb)
+        if (state.rhythm.powerUp !== 'normal') {
+            setPowerUp('normal');
+            audio.playFail();
+            showFeedback("POWER DOWN", "#f00");
+        } else {
+            state.rhythm.combo = 0;
+            audio.playFail();
+            showFeedback("MISS", "#f00");
+        }
 
         note.el.remove();
-        showFeedback("MISS", "#f00");
     }
 
     updateHud();
@@ -346,10 +453,6 @@ function updateHud() {
     uiLayer.score.textContent = state.rhythm.score;
     uiLayer.combo.textContent = state.rhythm.combo;
 }
-
-// ----------------------
-// END RHYTHM LOGIC
-// ----------------------
 
 // Scene Rendering & Standard Logic
 
@@ -397,7 +500,7 @@ function renderLobby() {
     });
 
     playerEl.style.display = 'block';
-    uiLayer.rhythmHud.classList.add('hidden'); // Ensure hud hidden in lobby
+    uiLayer.rhythmHud.classList.add('hidden');
 }
 
 function checkCollisions() {
@@ -443,7 +546,7 @@ async function enterRoom(roomId, doorEl) {
     await new Promise(r => setTimeout(r, 2000));
 
     const room = CONFIG.ROOMS.find(r => r.id === roomId);
-    loadRoomContent(room); // This now starts Rhythm Game
+    loadRoomContent(room);
 
     uiLayer.transition.classList.add('hidden');
     state.isTransitioning = false;
@@ -451,7 +554,6 @@ async function enterRoom(roomId, doorEl) {
 
 function loadRoomContent(room) {
     sceneLayer.innerHTML = '';
-    // Player IS visible for Rhythm Game
     playerEl.style.display = 'block';
 
     const video = document.createElement('video');
@@ -464,7 +566,6 @@ function loadRoomContent(room) {
     video.loop = true;
     video.controls = false;
 
-    // Video is background for rhythm
     sceneLayer.appendChild(video);
 
     // Start Rhythm
@@ -482,7 +583,7 @@ function returnToLobby() {
     }, 1000);
 }
 
-// Audio System (Keep same)
+// Audio System
 const audio = {
     ctx: new (window.AudioContext || window.webkitAudioContext)(),
     playTone(freq, type, duration) {
@@ -498,7 +599,7 @@ const audio = {
         osc.start();
         osc.stop(this.ctx.currentTime + duration);
     },
-    playNoise(duration) { /* ... same noise ... */
+    playNoise(duration) {
         if (this.ctx.state === 'suspended') this.ctx.resume();
         const bufferSize = this.ctx.sampleRate * duration;
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -535,4 +636,5 @@ document.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => audio.playClick());
 });
 
+// Start
 init();
