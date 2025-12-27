@@ -1,0 +1,585 @@
+:root {
+  --bg-color: #1a1510;
+  --terminal-green: #38b44a;
+  --retro-gold: #c5a45b;
+  --crt-flicker: rgba(18, 16, 16, 0.1);
+  --player-size: 48px;
+  --player-speed: 4px;
+}
+
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+  font-family: 'Courier New', Courier, monospace;
+  overflow: hidden;
+  color: #fff;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#app {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  /* Force 16:9 */
+  max-height: 100vh;
+  margin: auto;
+  /* Center in body */
+  position: relative;
+  background: var(--bg-color);
+  overflow: hidden;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+}
+
+/* CRT Effects */
+.crt-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.6) 100%);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.scanline {
+  width: 100%;
+  height: 100%;
+  z-index: 101;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 3px, 3px 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  animation: flicker 0.15s infinite;
+}
+
+@keyframes flicker {
+  0% {
+    opacity: 0.95;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Game Container */
+#game-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+#scene-layer {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  /* Changed from flex to allow absolute positioning of doors */
+
+  /* Background Image - Force Fit */
+  background: url('/lobby-bg.jpg') no-repeat center center;
+  background-size: 100% 100%;
+  /* Stretch to fit strict 16:9 container */
+
+  /* Depth for character movement */
+  perspective: 1000px;
+}
+
+/* Character - Pixel Art Style (Mario-like) */
+.character {
+  width: 40px;
+  height: 48px;
+  position: absolute;
+  z-index: 50;
+  /* Ensure visible above background */
+  transition: none;
+  image-rendering: pixelated;
+
+  /* Simple Pixel Art using CSS Gradients/Shadows or base64?
+     Let's use a simple CSS shape for now that looks like a person */
+  background: transparent;
+  overflow: visible;
+  /* Shadow for feet */
+  filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.5));
+}
+
+/* Pixel Art Body Construction */
+.character::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+  /* Red Hat & Shirt, Blue Overalls */
+  background-image:
+    linear-gradient(#f00 0, #f00 12px, transparent 12px),
+    /* Hat */
+    linear-gradient(to right, #feb 10px, transparent 10px, transparent 30px, #feb 30px),
+    /* Face sides */
+    linear-gradient(#feb 12px, #feb 24px, transparent 24px),
+    /* Face */
+    linear-gradient(#f00 24px, #f00 34px, transparent 34px),
+    /* Shirt */
+    linear-gradient(#00f 34px, #00f 48px, transparent 48px);
+  /* Pants */
+
+  /* More detailed pixel art using box-shadow is expensive but better.
+     Let's stick to this abstract "8-bit blocky" look or use an emoji if browser supports. */
+}
+
+/* Let's try a distinct SVG data URI for a pixel character to be sure it looks like a person */
+.character {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 16'%3E%3Cpath fill='%23d32' d='M3 0h5v1H3zM2 1h7v1H2z'/%3E%3Cpath fill='%23fb0' d='M2 2h6v1H2zM1 3h1v1H1zM3 3h1v1H3zM7 3h2v1H7zM1 4h3v1H1zM5 4h4v1H5z'/%3E%3Cpath fill='%23d32' d='M4 5h4v1H4zM3 6h6v1H3zM2 7h8v1H2z'/%3E%3Cpath fill='%2323d' d='M3 8h6v1H3zM2 9h2v1H2zM5 9h2v1H5zM8 9h2v1H8zM1 10h4v1H1zM7 10h4v1H7zM0 11h4v1H0zM8 11h4v1H8z'/%3E%3Cpath fill='%2323d' d='M2 12h8v2H2zM1 14h3v2H1zM8 14h3v2H8z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  width: 48px;
+  height: 64px;
+}
+
+.character::before,
+.character::after {
+  content: none;
+  /* Remove old shapes */
+}
+
+.walking {
+  animation: hop 0.2s infinite alternate;
+}
+
+@keyframes hop {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+/* Lobby Doors (Hitboxes) - Invisible Interaction Zones */
+.door {
+  position: absolute;
+  /* Absolute positioning for placing over image */
+  width: 140px;
+  height: 220px;
+  background: transparent;
+  /* Hidden */
+  border: none;
+  /* Hidden */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: all 0.3s;
+}
+
+/* Video Player Adjustment */
+#scene-layer video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 
+     User requested shifting video content down ~300px without gaps.
+     Since video is vertical (portrait) covering a 16:9 landscape, there is lots of hidden vertical content.
+     Default is 50% (Center). Moving to ~30% moves the image DOWN (revealing top).
+     Moving to ~70% moves the image UP (revealing bottom).
+     "Move display area down" -> Image moves down.
+     User Update: Move UP 100px from previous (30%).
+     Moving from 30% towards 50% moves the image UP.
+  */
+  object-position: center 40%;
+  transform: none;
+  z-index: 10;
+}
+
+#input-panel {
+  position: absolute;
+  bottom: 80px;
+  /* Moved up slightly to float nicely */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  /* Darker opacity */
+  padding: 20px 40px;
+  border: 2px solid #c5a45b;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
+  z-index: 200;
+  /* Ensure on top of video */
+}
+
+
+
+/* Door Trim/Decor - Removed as they are in the image now */
+.door::after {
+  content: none;
+}
+
+/* Room Name/Number - Removed to avoid duplication, using .plate instead */
+.door::before {
+  content: none;
+}
+
+/* Door Plate (Top) */
+.door .plate {
+  position: absolute;
+  top: -30px;
+  background: #c5a45b;
+  color: #2b0b0b;
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  padding: 0;
+  font-weight: bold;
+  font-family: 'Times New Roman', serif;
+  font-size: 24px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  /* Circle Plate */
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+/* Door Animation (Push Open) */
+/* We keep the 3D rotation for the "Enter" validation effect */
+.door.open {
+  transform: scale(0.9);
+  opacity: 0;
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+/* Start Screen */
+#start-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.title {
+  font-size: 64px;
+  color: var(--retro-gold);
+  text-shadow: 4px 4px 0 #8e7354;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: var(--terminal-green);
+  letter-spacing: 5px;
+  margin-bottom: 50px;
+}
+
+.retro-btn.large {
+  font-size: 24px;
+  padding: 15px 40px;
+  border: 4px solid var(--retro-gold);
+}
+
+.blink {
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Rhythm Game UI */
+#rhythm-hud {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  text-align: right;
+  z-index: 100;
+  font-family: 'Courier New', monospace;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.score-container {
+  font-size: 24px;
+  color: #fceabb;
+}
+
+.combo-container {
+  font-size: 32px;
+  color: #ff00de;
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+#rhythm-message {
+  font-size: 40px;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.1s;
+  min-height: 50px;
+}
+
+#rhythm-message.pop {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Falling Notes */
+.note {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: url('/disk.png');
+  /* Placeholder, we can basic CSS circle first */
+  background-color: #0ff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #0ff;
+  z-index: 50;
+  text-align: center;
+  line-height: 40px;
+  font-size: 20px;
+}
+
+.note.style-1 {
+  background-color: #f0f;
+  box-shadow: 0 0 10px #f0f;
+}
+
+.note.style-2 {
+  background-color: #ff0;
+  box-shadow: 0 0 10px #ff0;
+}
+
+.hit-effect {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  animation: ripple 0.5s ease-out forwards;
+  pointer-events: none;
+  z-index: 60;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(2.0);
+    opacity: 0;
+  }
+}
+
+#controls-hint {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  width: auto;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 20;
+  text-shadow: 1px 1px 2px #000;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 10px;
+  border-radius: 4px;
+  border-right: 3px solid #c5a45b;
+}
+
+/* UI Layers */
+#ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+}
+
+#input-panel {
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  padding: 20px;
+  border: 2px solid var(--retro-gold);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+input {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid #666;
+  color: var(--retro-gold);
+  font-family: inherit;
+  font-size: 20px;
+  padding: 5px;
+  text-align: center;
+  outline: none;
+}
+
+input:focus {
+  border-bottom-color: var(--retro-gold);
+}
+
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.retro-btn {
+  background: var(--retro-gold);
+  color: #000;
+  border: none;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #4a3b2a;
+}
+
+.retro-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #4a3b2a;
+}
+
+.retro-btn.secondary {
+  background: #888;
+}
+
+.retro-btn.danger {
+  background: #b43838;
+  color: #fff;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Transitions */
+#transition-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 50;
+}
+
+.disk-spinner {
+  width: 100px;
+  height: 100px;
+  border: 10px solid #333;
+  border-top: 10px solid var(--retro-gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  margin-top: 20px;
+  color: var(--retro-gold);
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+
+/* Settlement Screen */
+.settlement-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--retro-gold);
+  text-align: center;
+  animation: fadeIn 1s ease-in;
+}
+
+.settlement-screen h1 {
+  font-size: 48px;
+  text-shadow: 4px 4px 0 #552;
+  margin-bottom: 20px;
+}
+
+.final-score {
+  font-size: 36px;
+  margin: 20px 0;
+  color: var(--terminal-green);
+  text-shadow: 0 0 10px var(--terminal-green);
+}
+
+.stats {
+  font-size: 24px;
+  color: #ccc;
+  margin-bottom: 40px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
